@@ -82,3 +82,58 @@ $ aws --profile admin configure set aws_secret_access_key <new secret key>
 # delete the old ones (beware eventual consistency)
 $ aws --profile admin iam delete-access-key --user-name <username> --access-key-id <old key>
 ```
+
+## VPC Creation with AWS CloudFormation
+
+```bash
+# validate template
+$ aws --profile admin cloudformation validate-template --template-body file://cloudformation/network/microservices-network.yml
+
+# create the stack for microservices network
+$ aws --profile dev cloudformation create-stack --stack-name microservices-network --template-body file://cloudformation/network/microservices-network.yml --parameters ParameterKey=VpcCidrPrefix,ParameterValue=10.0
+
+# wait for the stack to finish
+$ aws --profile dev cloudformation wait stack-create-complete --stack-name microservices-network
+
+# list the exports
+$ aws --profile dev cloudformation list-exports
+
+# list the exports as table
+$ aws --profile dev cloudformation list-exports --query 'Exports[].[Name,Value]' --output table
+
+# list the exports using jq
+$ aws --profile dev cloudformation list-exports | jq -r '.Exports[] | "\(.Name): \(.Value)"'
+```
+
+## Getting Resource Details with CLI
+
+```bash
+# use this to list all VPCs
+$ aws --profile dev ec2 describe-vpcs
+
+# filter by tag name
+$ aws --profile dev ec2 describe-vpcs --filters "Name=tag:Name,Values=microservices-network"
+
+# capture VPC ID to env variable
+$ VPC_ID=$(aws --profile dev ec2 describe-vpcs --filters "Name=tag:Name,Values=microservices-network" --query 'Vpcs[0].VpcId' --output text)
+
+# verify VPC_ID
+$ echo ${VPC_ID}
+
+# find subnets using VPC_ID
+$ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}"
+
+# user --query for cleaner output
+$ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[].[SubnetId, CidrBlock]' --output text
+
+# add scope
+$ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[].[SubnetId, CidrBlock, Tags[?Key==`Scope`].Value]' --output text
+
+# add scope
+$ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[].[SubnetId, CidrBlock, Tags[?Key==`Scope`]|[0].Value]' --output text
+
+# add scope, AZ and available address on same line
+$ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[].[Tags[?Key==`Name`]|[0].Value,SubnetId, CidrBlock,Tags[?Key==`Scope`]|[0].Value, AvailableIpAddressCount, AvailabilityZone]' --output table
+
+
+```
