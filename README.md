@@ -134,6 +134,51 @@ $ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}
 
 # add scope, AZ and available address on same line
 $ aws --profile dev ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[].[Tags[?Key==`Name`]|[0].Value,SubnetId, CidrBlock,Tags[?Key==`Scope`]|[0].Value, AvailableIpAddressCount, AvailabilityZone]' --output table
+```
 
+## Creating Gateways and Routes with AWS Cloudformation
 
+```bash
+# validate the template
+$ aws --profile dev cloudformation validate-template --template-body file://cloudformation/network/microservices-internet.yml
+
+# create the stack for microservices network internet access
+$ aws --profile dev cloudformation create-stack --stack-name microservices-internet --template-body file://cloudformation/network/microservices-internet.yml --parameters ParameterKey=NetworkStack,ParameterValue=microservices-network
+
+# wait for the stack to finish
+$ aws --profile dev cloudformation wait stack-create-complete --stack-name  microservices-internet
+
+# describe stack events
+$ aws --profile dev cloudformation describe-stack-events --stack-name microservices-internet --query 'StackEvents[].[{Resource:LogicalResourceId, Status:ResourceStatus, Reason:ResourceStatusReason}]' --output table
+
+# capture VPC ID to env variable
+VPC_ID=$(aws --profile dev ec2 describe-vpcs --filters "Name=tag:Name,Values=microservices-network" --query 'Vpcs[0].VpcId' --output text)
+
+# show routes
+$ aws --profile dev ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}"
+
+# show routes with cleaner output
+$ aws --profile dev ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}" --query 'RouteTables[].[Tags[?Key==`Name`].Value, Associations[].SubnetId]' --output text
+```
+
+## Managin Network ACLs with AWS CloudFormation
+
+```bash
+# validate the template
+$ aws --profile dev cloudformation validate-template --template-body file://cloudformation/network/microservices-security.yml
+
+# create the stack for microservices network internet access
+$ aws --profile dev cloudformation create-stack --stack-name microservices-security --template-body file://cloudformation/network/microservices-security.yml --parameters ParameterKey=NetworkStack,ParameterValue=microservices-network
+
+# wait for the stack to finish
+$ aws --profile dev cloudformation wait stack-create-complete --stack-name microservices-security
+
+# capture VPC ID  to env variable
+$ VPC_ID=$(aws --profile dev ec2 describe-vpcs --filter "Name=tag:Name,Values=microservices-network" --query 'Vpcs[0].VpcId' --output text)
+
+# list network ACLs
+$ aws --profile dev ec2 describe-network-acls --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:aws:cloudformation:stack-name,Values=microservices-security" --query 'NetworkAcls[].[NetworkAclId,Tags[?Key==`Name`]|[0].Value]' --output text
+
+# list NACL entries
+$ aws --profile dev ec2 describe-network-acls --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:aws:cloudformation:stack-name,Values=microservices-security" --query 'NetworkAcls[].Entries[]'
 ```
