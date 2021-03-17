@@ -213,3 +213,19 @@ $ aws --profile dev ec2 describe-network-acls --filters "Name=vpc-id,Values=${VP
 # describe entries with customized names & values
 $ aws --profile dev ec2 describe-network-acls --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:aws:cloudformation:stack-name,Values=microservices-security" --query 'NetworkAcls[].Entries[].{Num:RuleNumber, Rule:RuleAction, Range:CidrBlock, Protocol:Protocol, Egress:Egress, Ports:join(`-`,[to_string(PortRange.From), to_string(PortRange.To)])}' --output table
 ```
+
+## Creating Amazon Route 53 Zones with AWS CloudFormation
+
+```bash
+# validate the template
+$ aws --profile dev cloudformation validate-template --template-body file://cloudformation/network/private-hosted-zones.yml
+
+# caputre VPC ID to env variable
+$ VPC_ID=$(aws --profile dev ec2 describe-vpcs --filters "Name=tag:Name,Values=microservices-network" --query 'Vpcs[0].VpcId' --output text)
+
+# create the stack for microservices network internet access and wait for completion
+$ aws --profile dev cloudformation create-stack --stack-name private-hosted-zones --template-body file://cloudformation/network/private-hosted-zones.yml && aws --profile dev cloudformation wait stack-create-complete --stack-name private-hosted-zones
+
+# list hosted zone
+$ aws --profile dev route53 list-hosted-zones-by-name --dns-name <zone name> --max-items 1
+```

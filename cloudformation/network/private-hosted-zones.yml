@@ -1,0 +1,11 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Private Host Zone"
+
+Resources:
+  route53PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: "rmr.aws"
+      VPCs:
+      - VPCId: vpc-03198705913d9a8e3 # microservices-network in us-east-2
+        VPCRegion: "us-east-2"
